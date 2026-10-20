@@ -272,6 +272,16 @@ input,select{padding:5px 4px}.row{margin-top:4px}.row.head{margin-top:6px}
 .fl.open{grid-template-rows:1fr}
 .fl>div{overflow:hidden;min-height:0;visibility:hidden;transition:visibility 0s .3s}
 .fl.open>div{visibility:visible;transition:none}
+.hint{color:var(--muted);font-size:13px;margin:10px 4px}
+.calw{position:relative;display:inline-flex}
+.calw input{position:absolute;inset:0;width:100%;height:100%;opacity:0;padding:0;margin:0;cursor:pointer}
+.calw .sqb{font-size:15px}
+.frow button.fe{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0;font:inherit;color:var(--text);text-align:left}
+dialog.big{width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 48px);overflow-y:auto}
+.hx{margin:14px 0 4px}.hx>b{font-size:14px}
+.hs{display:grid;grid-template-columns:62px 1fr 1fr;gap:6px;align-items:center;margin:4px 0}
+.hs span{color:var(--muted);font-size:12px;font-weight:700;white-space:nowrap}
+.hs input{margin:0}
 </style>
 </head>
 <body>
@@ -294,12 +304,16 @@ input,select{padding:5px 4px}.row{margin-top:4px}.row.head{margin-top:6px}
   </div>
   <div id="pgP" class="pg">
     <div class="hd" style="margin-top:14px"><h1>Fortschritt</h1></div>
+    <div class="opts mode" id="pview"><button data-pv="chart">Diagramm</button><button data-pv="log">Verlauf</button></div>
+    <div id="pvC">
     <div class="opts mode" id="mode"><button data-m="kg">Gewicht (kg)</button><button data-m="pct">Entwicklung (%)</button></div>
     <div class="chartbox" id="chart"></div>
     <div class="plist" id="plist"></div>
+    </div>
+    <div id="pvL" hidden></div>
   </div>
   <div id="pgN" class="pg">
-    <div class="hd" style="margin-top:14px"><h1>Ernährung</h1><div class="dstep"><button class="sqb sm" id="fprev" aria-label="Vorheriger Tag">‹</button><button class="pill" id="ftoday">Heute</button><button class="sqb sm" id="fnext" aria-label="Nächster Tag">›</button></div></div>
+    <div class="hd" style="margin-top:14px"><h1>Ernährung</h1><div class="dstep"><span class="calw"><button class="sqb sm" tabindex="-1" aria-hidden="true">📅</button><input type="date" id="fdate" aria-label="Datum wählen"></span><button class="sqb sm" id="fprev" aria-label="Vorheriger Tag">‹</button><button class="pill" id="ftoday">Heute</button><button class="sqb sm" id="fnext" aria-label="Nächster Tag">›</button></div></div>
     <div id="fbody" style="margin-top:10px"></div>
   </div>
   <div id="pgS" class="pg">
@@ -334,7 +348,8 @@ input,select{padding:5px 4px}.row{margin-top:4px}.row.head{margin-top:6px}
   <p id="dlgp"></p>
   <div class="dbtn"><button class="btn" id="no2">Abbrechen</button><button class="btn main" id="yes2">Importieren</button></div>
 </dialog>
-<dialog id="dlgf"><h3>Eintrag hinzufügen</h3><input id="fn" placeholder="Name (optional)" maxlength="60"><div class="two"><input id="fk" inputmode="decimal" placeholder="kcal"><input id="fp" inputmode="decimal" placeholder="Protein (g)"></div><div class="err" id="ferr"></div><div class="dbtn"><button class="btn" id="fno">Abbrechen</button><button class="btn main" id="fyes">Hinzufügen</button></div></dialog>
+<dialog id="dlgh" class="big"><h3 id="dlght" tabindex="-1" autofocus style="outline:0">Training bearbeiten</h3><div class="lab" style="margin-top:8px">Datum</div><input type="date" id="hdate" aria-label="Datum"><div id="hbody"></div><div class="err" id="herr"></div><div class="dbtn"><button class="btn" id="hno">Abbrechen</button><button class="btn main" id="hyes">Speichern</button></div><button class="reset" id="hdel" data-l="Training löschen">Training löschen</button></dialog>
+<dialog id="dlgf"><h3 id="dlgft">Eintrag hinzufügen</h3><input id="fn" placeholder="Name (optional)" maxlength="60"><div class="two"><input id="fk" inputmode="decimal" placeholder="kcal"><input id="fp" inputmode="decimal" placeholder="Protein (g)"></div><div class="err" id="ferr"></div><div class="dbtn"><button class="btn" id="fno">Abbrechen</button><button class="btn main" id="fyes">Hinzufügen</button></div></dialog>
 <dialog id="dlga"><h3>Foto + KI</h3>
   <div id="astep1"><div class="dbtn"><button class="btn" id="acam">📷 Foto aufnehmen</button><button class="btn" id="agal">🖼 Galerie</button></div>
     <input type="file" id="afc" accept="image/*" capture="environment" hidden><input type="file" id="afg" accept="image/*" hidden>
@@ -395,7 +410,7 @@ function init(){
 let S=init(),openIdx=-1,editMode=false;
 let sel=load("tl_sel",null),pm=load("tl_pm","kg");if(sel)sel=sel.map(v=>String(v).split("|").pop());
 const COLORS=["#ff8a5c","#3fd5ff","#4ade80","#c084fc","#ffc857","#fb7185"];
-const sg=()=>JSON.stringify([S.tabs,S.hist,S.last,S.lib,S.splits,S.food]);let sig=sg();
+const sg=()=>JSON.stringify([S.tabs,S.hist,S.last,S.lib,S.splits,S.food,S.presets]);let sig=sg();
 function sv(){const n=sg();if(n!==sig){sig=n;S.mod=Date.now();schedPush()}store("tl2",S)}
 const SP=()=>S.splits.find(x=>x.id===S.split)||S.splits[0];
 const ST=()=>SP().tabs.map(id=>S.tabs.find(t=>t.id===id)).filter(Boolean);
@@ -480,6 +495,9 @@ function renderProg(){
     return `<button class="pr${on?" on":""}" role="checkbox" aria-checked="${on}" data-px="${e.id}" style="${on?`border-color:${c}`:""}">${cb}<span class="pn"><b>${esc(e.name)}</b><small>🏆 ${pr.w} kg × ${pr.r}</small></span><span class="pv" style="color:${col}"><span>${sg(d)} kg</span><small>${sg(pc)} %</small></span></button>`;
   }).join("")||'<p class="empty">Noch keine Übungen vorhanden.</p>';
   document.querySelectorAll("#mode button").forEach(b=>b.classList.toggle("on",b.dataset.m===pm));
+  document.querySelectorAll("#pview button").forEach(b=>b.classList.toggle("on",b.dataset.pv===pv));
+  $("#pvC").hidden=pv!=="chart";$("#pvL").hidden=pv!=="log";
+  if(pv==="log")renderHist();
   draw();
 }
 function draw(){
@@ -510,6 +528,64 @@ function draw(){
     x.pts.forEach((p,i)=>{dots+=`<circle class="pt" cx="${X(p.t)}" cy="${Y(val(x,p))}" r="${i===pr?6:3.5}" style="animation-delay:${.3+i*.04}s;fill:${x.c};stroke:${i===pr?"var(--warm2)":"var(--card)"};stroke-width:${i===pr?2.5:1.5}"><title>${esc(x.name)}: ${p.w} kg × ${p.r}, ${dt(p.t)}</title></circle>`});
   });
   box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf der besten Arbeitssätze"><defs>${defs}</defs>${grid}${lines}${dots}<text x="${Lm}" y="${H-6}" font-size="10" style="fill:var(--muted)">${dt(t0)}</text>${t1>t0?`<text x="${W-Rm}" y="${H-6}" text-anchor="end" font-size="10" style="fill:var(--muted)">${dt(t1)}</text>`:""}</svg>`;
+}
+let pv="chart",hcur=null;
+const SETN=["Warm-up","Satz 1","Satz 2"];
+const byDate=(a,b)=>Date.parse(a.date)-Date.parse(b.date);
+function rebuildLast(tid){const arr=(S.hist[tid]||[]).slice().sort(byDate);if(!arr.length){delete S.last[tid];return}const v={};arr.forEach(h=>Object.assign(v,h.v));S.last[tid]={date:arr[arr.length-1].date,v}}
+const hIds=v=>[...new Set(Object.keys(v).filter(k=>/^[\w-]+-\d-[wr]$/.test(k)&&v[k]!=="").map(k=>k.replace(/-\d-[wr]$/,"")))];
+function renderHist(){
+  const rows=[];
+  Object.keys(S.hist).forEach(tid=>{const t=S.tabs.find(x=>x.id===tid);S.hist[tid].forEach(h=>rows.push({tid,h,t}))});
+  rows.sort((a,b)=>byDate(b.h,a.h));
+  $("#pvL").innerHTML=rows.length?`<p class="hint">Tippe auf ein Training, um Werte oder Datum zu ändern.</p><div class="plist">`+rows.slice(0,300).map(r=>{
+    const n=hIds(r.h.v).length,d=new Date(r.h.date);
+    return `<button class="pr" data-hedit="${esc(r.tid)}|${esc(r.h.date)}"><span class="pn"><b>${esc(r.t?r.t.name:"Training")}</b><small>${n} Übung${n===1?"":"en"}</small></span><span class="pv" style="color:var(--muted)"><span>${d.toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"})}</span><small>${d.getFullYear()}</small></span></button>`;
+  }).join("")+`</div>`:'<p class="empty">Noch keine Trainings gespeichert.</p>';
+}
+function openHist(tid,date){
+  const h=(S.hist[tid]||[]).find(x=>x.date===date);if(!h)return;
+  hcur={tid,date};
+  const t=S.tabs.find(x=>x.id===tid),ids=[],add=id=>{if(!ids.includes(id))ids.push(id)};
+  if(t)t.ex.forEach(e=>{add(e.id)});
+  hIds(h.v).forEach(add);
+  $("#dlght").textContent=(t?t.name:"Training")+" bearbeiten";
+  $("#hdate").value=dkey(new Date(h.date));$("#hdate").max=todayKey();
+  $("#hbody").innerHTML=ids.map(id=>{
+    const e=S.lib.find(x=>x.id===id),nm=e?e.name:id;
+    return `<div class="hx"><b>${esc(nm)}</b>`+[0,1,2].map(j=>`<div class="hs"><span>${SETN[j]}</span><input data-hk="${esc(id)}-${j}-w" inputmode="decimal" placeholder="kg" value="${esc(h.v[id+"-"+j+"-w"]||"")}" aria-label="${esc(nm)} ${SETN[j]} kg"><input data-hk="${esc(id)}-${j}-r" inputmode="numeric" placeholder="Wdh" value="${esc(h.v[id+"-"+j+"-r"]||"")}" aria-label="${esc(nm)} ${SETN[j]} Wiederholungen"></div>`).join("")+`</div>`;
+  }).join("");
+  $("#herr").textContent="";$("#dlgh").showModal();$("#dlgh").scrollTop=0;
+}
+function saveHist(){
+  if(!hcur)return;
+  const arr=S.hist[hcur.tid]||[],h=arr.find(x=>x.date===hcur.date);if(!h){$("#dlgh").close();return}
+  const v={};let bad=false;
+  document.querySelectorAll("#hbody [data-hk]").forEach(inp=>{
+    inp.style.borderColor="";const x=inp.value.trim().replace(",",".");if(!x)return;
+    const w=inp.dataset.hk.endsWith("-w"),n=parseFloat(x);
+    if(!isFinite(n)||n<0||n>1000||(!w&&n!==Math.round(n))){bad=true;inp.style.borderColor="#ff6b6b";return}
+    v[inp.dataset.hk]=String(w?Math.round(n*100)/100:Math.round(n));
+  });
+  if(bad){$("#herr").textContent="Bitte gültige Zahlen eingeben (Wdh ganzzahlig).";return}
+  if(!Object.keys(v).length){$("#herr").textContent="Mindestens ein Wert nötig – oder Training löschen.";return}
+  const dv=$("#hdate").value;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(dv)||dv>todayKey()){$("#herr").textContent="Bitte ein Datum bis heute wählen.";return}
+  const od=new Date(h.date);
+  if(dkey(od)!==dv){
+    let nd=new Date(dv+"T"+pad2(od.getHours())+":"+pad2(od.getMinutes())+":"+pad2(od.getSeconds()));
+    while(arr.some(x=>x!==h&&x.date===nd.toISOString()))nd=new Date(nd.getTime()+1000);
+    h.date=nd.toISOString();
+  }
+  h.v=v;arr.sort(byDate);rebuildLast(hcur.tid);undo=null;hcur=null;
+  sv();$("#dlgh").close();renderProg();renderList();toast("Training aktualisiert",1800);
+}
+function delHist(){
+  if(!hcur)return;
+  const tid=hcur.tid,arr=S.hist[tid]||[],i=arr.findIndex(x=>x.date===hcur.date);if(i<0)return;
+  const h=arr.splice(i,1)[0];rebuildLast(tid);undo=null;hcur=null;
+  sv();$("#dlgh").close();renderProg();renderList();
+  toast("Training gelöscht",6000,{label:"↩ Rückgängig",fn:()=>{(S.hist[tid]=S.hist[tid]||[]).push(h);S.hist[tid].sort(byDate);rebuildLast(tid);sv();renderProg();renderList()}});
 }
 function applyTheme(){
   const pref=load("tl_theme","dark");let t=pref;
@@ -569,9 +645,10 @@ document.addEventListener("click",e=>{
   if(b=g("#fgoal")){gedit=true;return renderFood()}
   if(b=g("#gcancel")){gedit=false;return renderFood()}
   if(b=g("#gsave")){const k=fnum($("#gk").value),pr=fnum($("#gp").value);if(k<800||k>10000||pr<10||pr>500){toast("Bitte realistische Werte eingeben",2200);return}FD().goal={kcal:Math.round(k),protein:Math.round(pr)};gedit=false;sv();return renderFood()}
-  if(b=g("#fman")){$("#fn").value="";$("#fk").value="";$("#fp").value="";$("#ferr").textContent="";$("#dlgf").showModal();$("#fk").focus();return}
+  if(b=g("#fman")){fedit=null;$("#dlgft").textContent="Eintrag hinzufügen";$("#fyes").textContent="Hinzufügen";$("#fn").value="";$("#fk").value="";$("#fp").value="";$("#ferr").textContent="";$("#dlgf").showModal();$("#fk").focus();return}
   if(b=g("#fno"))return $("#dlgf").close();
-  if(b=g("#fyes")){const k=fnum($("#fk").value),pr=fnum($("#fp").value);if(!k&&!pr){$("#ferr").textContent="Bitte Kalorien oder Protein eintragen";return}addFood({name:$("#fn").value,kcal:k,p:pr,src:"m"});$("#dlgf").close();return}
+  if(b=g("#fyes")){const k=fnum($("#fk").value),pr=fnum($("#fp").value);if(!k&&!pr){$("#ferr").textContent="Bitte Kalorien oder Protein eintragen";return}if(fedit){const en=dayEntries(fday).find(x=>x.id===fedit);if(en){en.name=$("#fn").value.trim().slice(0,60);en.kcal=k;en.p=pr;sv();renderFood()}else addFood({name:$("#fn").value,kcal:k,p:pr,src:"m"});fedit=null}else addFood({name:$("#fn").value,kcal:k,p:pr,src:"m"});$("#dlgf").close();return}
+  if(b=g("[data-fedit]")){const en=dayEntries(fday).find(x=>x.id===b.dataset.fedit);if(!en)return;fedit=en.id;$("#dlgft").textContent="Eintrag bearbeiten";$("#fyes").textContent="Speichern";$("#fn").value=en.name;$("#fk").value=en.kcal||"";$("#fp").value=en.p||"";$("#ferr").textContent="";$("#dlgf").showModal();return}
   if(b=g("[data-frec]")){const e=frecs[+b.dataset.frec];if(e)addFood({name:e.name,kcal:e.kcal,p:e.p,src:e.src});return}
   if(b=g("[data-fdel]"))return delFood(b.dataset.fdel);
   if(b=g("#fai"))return aOpen();
@@ -590,14 +667,19 @@ document.addEventListener("click",e=>{
   if(b=g("#tminus"))return setDur(tm.dur-5);
   if(b=g("#tplus"))return setDur(tm.dur+5);
   if(b=g("#tnotif")){notifOn=!notifOn;store("tl_notif",notifOn);if(notifOn){askNotif();if("Notification" in window&&Notification.permission==="denied")toast("Bitte in den Browser-Einstellungen erlauben",2800)}renderChips();return}
-  if(b=g("#tadd")){if(presets.includes(tm.dur))toast("Gibt es schon",1400);else if(presets.length>=12)toast("Maximal 12 Presets",1800);else{presets.push(tm.dur);store("tl_presets",presets);toast("Preset gespeichert: "+tm.dur+" s",1600)}renderChips();return}
+  if(b=g("#tadd")){if(S.presets.includes(tm.dur))toast("Gibt es schon",1400);else if(S.presets.length>=12)toast("Maximal 12 Presets",1800);else{S.presets.push(tm.dur);sv();toast("Preset gespeichert: "+tm.dur+" s",1600)}renderChips();return}
   if(b=g("#tedit")){pedit=!pedit;renderChips();return}
-  if(b=g(".chip[data-s]")){const v=+b.dataset.s;if(pedit){presets=presets.filter(x=>x!==v);store("tl_presets",presets);renderChips()}else setDur(v);return}
+  if(b=g(".chip[data-s]")){const v=+b.dataset.s;if(pedit){S.presets=S.presets.filter(x=>x!==v);sv();renderChips()}else setDur(v);return}
   if(b=g("#cno"))return $("#dlgc").close();
   if(b=g("#cyes")){$("#dlgc").close();if(cfn){const f=cfn;cfn=null;f()}return}
   if(b=g(".pr[data-px]")){const v=b.dataset.px,i=sel.indexOf(v);
     if(i>=0)sel.splice(i,1);else sel.push(v);
     store("tl_sel",sel);renderProg();return}
+  if(b=g("#pview button")){pv=b.dataset.pv;renderProg();return}
+  if(b=g("[data-hedit]")){const k=b.dataset.hedit,i=k.indexOf("|");openHist(k.slice(0,i),k.slice(i+1));return}
+  if(b=g("#hno"))return $("#dlgh").close();
+  if(b=g("#hyes"))return saveHist();
+  if(b=g("#hdel"))return arm(b,delHist,"Wirklich löschen?");
   if(b=g("#mode button")){pm=b.dataset.m;store("tl_pm",pm);renderProg();return}
   if(b=g("[data-th]")){store("tl_theme",b.dataset.th);applyTheme();return}
   if(b=g(".nav button"))return showPage(b.dataset.p);
@@ -733,6 +815,7 @@ function clean(o){
   const lib=(Array.isArray(d.lib)?d.lib:[]).slice(0,300).filter(e=>e&&e.id).map(e=>({id:str(e.id,40),name:str(e.name,40),ic:IC[e.ic]?e.ic:"db"}));
   N.lib=lib;N.splits=(Array.isArray(d.splits)?d.splits:[]).slice(0,20).map((x,i)=>({id:str(x&&x.id,40)||"s"+i,name:str(x&&x.name,24)||"Split",tabs:(Array.isArray(x&&x.tabs)?x.tabs:[]).filter(id=>ids.has(id))})).filter(x=>x.tabs.length);
   N.split=str(d.split,40);
+  if(Array.isArray(d.presets))N.presets=[...new Set(d.presets.map(x=>Math.round(+x)).filter(x=>x>=5&&x<=3600))].slice(0,12);
   const fd=d.food&&typeof d.food==="object"?d.food:{},nm=(x,m)=>{x=+x;return isFinite(x)?Math.max(0,Math.min(m,Math.round(x*10)/10)):0};
   N.food={goal:{kcal:nm(fd.goal&&fd.goal.kcal,20000),protein:nm(fd.goal&&fd.goal.protein,1000)},days:{}};
   Object.keys(fd.days||{}).sort().slice(-400).forEach(k=>{if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&Array.isArray(fd.days[k]))N.food.days[k]=fd.days[k].slice(0,100).map(e=>({id:str(e&&e.id,40)||uid("f"),name:str(e&&e.name,60),kcal:nm(e&&e.kcal,20000),p:nm(e&&e.p,1000),t:+(e&&e.t)||0,src:e&&e.src==="ai"?"ai":"m"}))});
@@ -790,7 +873,7 @@ function applyRemote(r,mod){
   r.draft=S.draft||{};r.cloudUid=fbU.uid;r.mod=mod;if(r.tabs.some(t=>t.id===S.tab))r.tab=S.tab;if(r.splits.some(x=>x.id===S.split))r.split=S.split;r.cur=S.cur;norm(r);
   S=r;sig=sg();store("tl2",S);cloudAt=Date.now();
   if(!S.tabs.some(t=>t.id===S.tab))S.tab=S.tabs[0].id;
-  renderAll();if($("#pgP").classList.contains("on"))renderProg();renderCloud();
+  renderAll();renderChips();renderFood();if($("#pgP").classList.contains("on"))renderProg();renderCloud();
 }
 function listen(){
   if(unsub)unsub();
@@ -831,6 +914,7 @@ renderCloud();applyTheme();if(fbCfg())fbInit(true);
 
 // ---------- Bibliothek, Splits, Rückgängig ----------
 function norm(N){
+  if(!Array.isArray(N.presets))N.presets=load("tl_presets",[30,45,60,90,120,180]);
   N.food=N.food||{};N.food.goal=N.food.goal||{kcal:0,protein:0};N.food.days=N.food.days||{};
   N.lib=N.lib||[];const seen=new Set(N.lib.map(e=>e.id));
   N.tabs.forEach(t=>t.ex.forEach(e=>{if(!seen.has(e.id)){seen.add(e.id);N.lib.push({id:e.id,name:e.name,ic:e.ic||"db"})}}));
@@ -958,12 +1042,12 @@ function tStart(){
 }
 function tReset(){tm.run=false;clearInterval(tm.tick);tm.left=tm.dur;relWL();stopAudio();renderTimer()}
 function tFinish(){tm.run=false;clearInterval(tm.tick);tm.left=0;relWL();renderTimer();if(tauBell&&tau&&!tau.paused){if(navigator.vibrate)navigator.vibrate([250,120,250])}else bell();notify();toast("⏱ Pause vorbei",2500)}
-let presets=load("tl_presets",[30,45,60,90,120,180]),pedit=false;
+let pedit=false;
 function renderChips(){
-  const c=$("#tchips"),key=presets.join(",")+"|"+pedit;
+  const c=$("#tchips"),key=S.presets.join(",")+"|"+pedit;
   if(c.dataset.k!==key){
     c.dataset.k=key;c.classList.toggle("edit",pedit);
-    c.innerHTML=presets.slice().sort((x,y)=>x-y).map(x=>`<button class="chip" data-s="${x}">${x} s<span class="cx" aria-hidden="true">✕</span></button>`).join("")+(pedit?"":`<button class="chip add" id="tadd" aria-label="Aktuelle Zeit als Preset speichern"></button>`);
+    c.innerHTML=S.presets.slice().sort((x,y)=>x-y).map(x=>`<button class="chip" data-s="${x}">${x} s<span class="cx" aria-hidden="true">✕</span></button>`).join("")+(pedit?"":`<button class="chip add" id="tadd" aria-label="Aktuelle Zeit als Preset speichern"></button>`);
   }
   c.querySelectorAll(".chip[data-s]").forEach(x=>x.classList.toggle("on",+x.dataset.s===tm.dur));
   const ad=$("#tadd");if(ad)ad.textContent="＋ "+tm.dur+" s";
@@ -971,7 +1055,7 @@ function renderChips(){
   $("#tnotif").textContent="Benachrichtigung: "+(notifOn?"An":"Aus");
 }
 function setDur(n){if(tm.run)return;tm.dur=Math.max(5,Math.min(3600,Math.round(n)||tm.dur));store("tl_dur",tm.dur);tm.left=tm.dur;renderTimer();renderChips()}
-document.addEventListener("change",e=>{if(e.target.id==="tsec")setDur(parseInt(e.target.value))});
+document.addEventListener("change",e=>{if(e.target.id==="tsec")setDur(parseInt(e.target.value));if(e.target.id==="fdate"){const v=e.target.value;if(/^\d{4}-\d{2}-\d{2}$/.test(v)&&v<=todayKey()){fday=v;fauto=v===todayKey();renderFood()}else renderFood()}});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&tm.run){tUpdate();reqWL()}});
 function moveNav(){
   const a=document.querySelector(".nav button.on"),i=$("#nind");if(!a||!i)return;
@@ -986,7 +1070,7 @@ const pad2=n=>String(n).padStart(2,"0");
 const dkey=d=>d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
 const todayKey=()=>dkey(new Date());
 const shiftDay=n=>{const d=new Date(fday+"T12:00:00");d.setDate(d.getDate()+n);return dkey(d)};
-let fopen=false,fday=todayKey(),fauto=true,gedit=false,frecs=[],afile=null,aurl="",AIM=null;
+let fedit=null,fopen=false,fday=todayKey(),fauto=true,gedit=false,frecs=[],afile=null,aurl="",AIM=null;
 const FD=()=>S.food;
 const fnum=x=>{x=parseFloat(String(x==null?"":x).replace(",","."));return isFinite(x)&&x>0?Math.round(x*10)/10:0};
 const dayEntries=k=>FD().days[k]||[];
@@ -1007,7 +1091,7 @@ function renderFood(){
   if(fauto)fday=todayKey();
   const g=FD().goal,isT=fday===todayKey(),box=$("#fbody");
   $("#ftoday").textContent=isT?"Heute":new Date(fday+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short",day:"numeric",month:"short"});
-  $("#fnext").disabled=isT;
+  $("#fnext").disabled=isT;const fd=$("#fdate");fd.max=todayKey();fd.value=fday;
   if(!(g.kcal>0&&g.protein>0)||gedit){
     box.innerHTML=`<div class="card ep"><div class="lab">Dein Tagesbedarf</div><p class="meta" style="white-space:normal;text-align:left;margin-bottom:8px">Mehr brauchst du nicht – den Rest trackst du über Einträge.</p><div class="two"><div><div class="lab">Kalorien (kcal)</div><input id="gk" inputmode="numeric" value="${g.kcal||""}" placeholder="z. B. 2400"></div><div><div class="lab">Protein (g)</div><input id="gp" inputmode="numeric" value="${g.protein||""}" placeholder="z. B. 150"></div></div><div class="dbtn" style="margin-top:6px">${gedit?'<button class="btn" id="gcancel">Abbrechen</button>':""}<button class="btn main" id="gsave">Speichern</button></div></div>`;
     return;
@@ -1015,10 +1099,11 @@ function renderFood(){
   const s2=sumDay(fday),pk=Math.min(100,s2.k/g.kcal*100),pp=Math.min(100,s2.p/g.protein*100),kr=Math.round(g.kcal-s2.k),pr=Math.round(g.protein-s2.p);
   const list=dayEntries(fday).slice().sort((a,b)=>a.t-b.t),seen=new Set();frecs=[];
   Object.keys(FD().days).sort().reverse().some(d=>{FD().days[d].slice().reverse().some(e=>{const key=e.name+"|"+e.kcal+"|"+e.p;if(!seen.has(key)){seen.add(key);frecs.push(e)}return frecs.length>=8});return frecs.length>=8});
-  box.innerHTML=`<div class="card fsum"><div class="m"><div class="mh"><b>Kalorien</b><span>${Math.round(s2.k)} / ${g.kcal} kcal</span></div><div class="mbar${s2.k>g.kcal?" over":""}"><i style="width:${pk}%"></i></div><div class="mr">${kr>=0?"noch "+kr+" kcal":Math.abs(kr)+" kcal drüber"}</div></div><div class="m"><div class="mh"><b>Protein</b><span>${Math.round(s2.p)} / ${g.protein} g</span></div><div class="mbar${s2.p>=g.protein?" ok":""}"><i style="width:${pp}%"></i></div><div class="mr">${pr>0?"noch "+pr+" g":"Ziel erreicht ✓"}</div></div></div>`+
+  const note=isT?"":`<p class="hint">Nachtrag für ${new Date(fday+"T12:00:00").toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})} – neue Einträge landen an diesem Tag.</p>`;
+  box.innerHTML=note+`<div class="card fsum"><div class="m"><div class="mh"><b>Kalorien</b><span>${Math.round(s2.k)} / ${g.kcal} kcal</span></div><div class="mbar${s2.k>g.kcal?" over":""}"><i style="width:${pk}%"></i></div><div class="mr">${kr>=0?"noch "+kr+" kcal":Math.abs(kr)+" kcal drüber"}</div></div><div class="m"><div class="mh"><b>Protein</b><span>${Math.round(s2.p)} / ${g.protein} g</span></div><div class="mbar${s2.p>=g.protein?" ok":""}"><i style="width:${pp}%"></i></div><div class="mr">${pr>0?"noch "+pr+" g":"Ziel erreicht ✓"}</div></div></div>`+
   `<div class="dbtn" style="margin:10px 0"><button class="btn" id="fman">＋ Manuell</button><button class="btn main" id="fai">📷 Foto + KI</button></div>`+
   (frecs.length?`<div class="rec">${frecs.map((e,i)=>`<button class="chip" data-frec="${i}">${esc(e.name||"Eintrag")} · ${e.kcal}</button>`).join("")}</div>`:"")+
-  (list.length?`<button class="ftog" id="ftog" aria-expanded="${fopen}" aria-controls="fl"><span class="ft">Einträge</span><span class="fc">${list.length}</span><span class="fs">${Math.round(s2.k)} kcal · ${Math.round(s2.p)} g</span>${svg('<path d="M6 9l6 6 6-6"/>','class="chev"')}</button><div class="fl${fopen?" open":""}" id="fl"><div>${list.map(e=>`<div class="frow"><span class="fn">${esc(e.name||"Eintrag")}${e.src==="ai"?" ✨":""}</span><span class="fv">${e.kcal} kcal · ${e.p} g</span><button data-fdel="${e.id}" aria-label="Löschen">✕</button></div>`).join("")}</div></div>`:`<p class="empty" style="margin:18px 8px">Noch nichts eingetragen.</p>`)+
+  (list.length?`<button class="ftog" id="ftog" aria-expanded="${fopen}" aria-controls="fl"><span class="ft">Einträge</span><span class="fc">${list.length}</span><span class="fs">${Math.round(s2.k)} kcal · ${Math.round(s2.p)} g</span>${svg('<path d="M6 9l6 6 6-6"/>','class="chev"')}</button><div class="fl${fopen?" open":""}" id="fl"><div>${list.map(e=>`<div class="frow"><button class="fe" data-fedit="${e.id}" aria-label="Eintrag bearbeiten"><span class="fn">${esc(e.name||"Eintrag")}${e.src==="ai"?" ✨":""}</span><span class="fv">${e.kcal} kcal · ${e.p} g</span></button><button data-fdel="${e.id}" aria-label="Löschen">✕</button></div>`).join("")}</div></div>`:`<p class="empty" style="margin:18px 8px">Noch nichts eingetragen.</p>`)+
   `<button class="reset" id="fgoal" style="margin-top:14px">Tagesbedarf ändern</button>`;
 }
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&["fn","fk","fp"].includes(e.target.id))$("#fyes").click()});

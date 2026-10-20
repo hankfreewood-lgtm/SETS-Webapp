@@ -254,6 +254,24 @@ input,select{padding:5px 4px}.row{margin-top:4px}.row.head{margin-top:6px}
 @media (max-height:700px){
 :root{--bh:26px}.tabs{padding:4px 16px}.card{padding:5px 8px;margin-bottom:3px}.wrap{padding-bottom:96px}.logo{font-size:15px}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.ln{stroke-dashoffset:0}}
+.plist{display:grid;gap:6px;margin-top:10px}
+.pr{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:14px;cursor:pointer;transition:border-color .2s,transform .15s}
+.pr:active{transform:scale(.985)}.pr:disabled{opacity:.5;cursor:default}
+.pr .pn{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.pr .pn b{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr .pn small{color:var(--muted);font-size:12px;font-weight:600}
+.pr .pv{display:flex;flex-direction:column;align-items:flex-end;font-weight:700;font-size:13px;white-space:nowrap}
+.pr .pv small{font-size:12px;opacity:.85}
+.ftog{display:flex;align-items:center;gap:10px;width:100%;margin:4px 0 6px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;cursor:pointer;text-align:left;transition:border-color .2s,transform .15s}
+.ftog:active{transform:scale(.985)}
+.ftog .ft{font-weight:700}
+.ftog .fc{min-width:22px;padding:1px 7px;border-radius:99px;background:var(--field);color:var(--muted);font-size:12px;font-weight:700;text-align:center}
+.ftog .fs{flex:1;text-align:right;color:var(--muted);font-size:13px;white-space:nowrap}
+.ftog[aria-expanded=true] .chev{transform:rotate(180deg)}
+.fl{display:grid;grid-template-rows:0fr;transition:grid-template-rows .3s cubic-bezier(.3,.9,.3,1)}
+.fl.open{grid-template-rows:1fr}
+.fl>div{overflow:hidden;min-height:0;visibility:hidden;transition:visibility 0s .3s}
+.fl.open>div{visibility:visible;transition:none}
 </style>
 </head>
 <body>
@@ -276,10 +294,9 @@ input,select{padding:5px 4px}.row{margin-top:4px}.row.head{margin-top:6px}
   </div>
   <div id="pgP" class="pg">
     <div class="hd" style="margin-top:14px"><h1>Fortschritt</h1></div>
-    <div class="dd" id="dd"><button class="ddb" id="ddb" aria-haspopup="listbox" aria-expanded="false"><span id="ddl"></span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button><div class="ddp" id="ddp" role="listbox" aria-multiselectable="true"></div></div>
     <div class="opts mode" id="mode"><button data-m="kg">Gewicht (kg)</button><button data-m="pct">Entwicklung (%)</button></div>
     <div class="chartbox" id="chart"></div>
-    <div class="legend" id="stats"></div>
+    <div class="plist" id="plist"></div>
   </div>
   <div id="pgN" class="pg">
     <div class="hd" style="margin-top:14px"><h1>Ernährung</h1><div class="dstep"><button class="sqb sm" id="fprev" aria-label="Vorheriger Tag">‹</button><button class="pill" id="ftoday">Heute</button><button class="sqb sm" id="fnext" aria-label="Nächster Tag">›</button></div></div>
@@ -289,7 +306,6 @@ input,select{padding:5px 4px}.row{margin-top:4px}.row.head{margin-top:6px}
     <div class="hd" style="margin-top:14px"><h1>Einstellungen</h1></div>
     <div class="cloud"><h3>Erscheinungsbild</h3><div class="opts" id="themeopts"><button data-th="auto">Auto</button><button data-th="light">Hell</button><button data-th="dark">Dunkel</button></div></div>
     <div class="cloud" id="cloud"></div>
-    <div class="cloud" id="aibox"><h3>KI-Foto-Analyse</h3><p>Für Kalorien per Foto trägst du hier einmalig den reCAPTCHA-Enterprise-Schlüssel ein, den du auch in Firebase App Check hinterlegt hast.</p><input id="ack" placeholder="reCAPTCHA-Schlüssel" autocomplete="off" spellcheck="false" autocapitalize="off"><button class="btn wide" id="acsave">Speichern</button></div>
     <div class="cloud"><h3>Daten</h3><p>Sichere dein Training als Datei oder stelle es wieder her.</p><div class="dbtn"><button class="btn" id="exp">Exportieren</button><button class="btn" id="imp">Importieren</button></div><input type="file" id="file" accept=".json,application/json" hidden></div>
     <div class="cloud" id="appbox" hidden><h3>App</h3><button class="btn wide" id="inst" hidden>App installieren</button><p id="iosh" hidden>Auf dem iPhone: Teilen-Symbol → „Zum Home-Bildschirm“</p></div>
     <button class="reset" id="rst">Alle Trainingsdaten zurücksetzen</button>
@@ -448,29 +464,34 @@ function renderList(dir=""){
   L2.innerHTML=listHTML(t,openIdx);
 }
 function renderAll(dir=""){theme();renderTabs();renderList(dir)}
+const colorOf=id=>{const i=S.lib.findIndex(e=>e.id===id);return i<0?COLORS[0]:i<COLORS.length?COLORS[i]:`hsl(${Math.round((i*137.5)%360)} 75% 62%)`};
+const ptsOf=(HA,id)=>HA.map(h=>{const b=best([h],id);return b&&{t:Date.parse(h.date),w:b.w,r:b.r}}).filter(Boolean).sort((a,b)=>a.t-b.t);
+const prIdx=pts=>{let pr=0;pts.forEach((p,i)=>{if(p.w>pts[pr].w||(p.w===pts[pr].w&&p.r>=pts[pr].r))pr=i});return pr};
 function renderProg(){
-  const all=S.lib,ok=new Set(all.map(e=>e.id));
+  const all=S.lib,ok=new Set(all.map(e=>e.id)),HA=allH();
   if(sel===null){const f=all.find(e=>allH().some(x=>best([x],e.id)))||all[0];sel=f?[f.id]:[];store("tl_sel",sel)}
-  sel=sel.filter(v=>ok.has(v)).slice(0,6);
-  const sc=$("#ddp").scrollTop;
-  $("#ddp").innerHTML=all.map(e=>{const k=sel.indexOf(e.id);return `<button class="ddo" role="option" data-v="${e.id}" aria-selected="${k>=0}"><span class="cb" style="${k>=0?`background:${COLORS[k]};border-color:${COLORS[k]}`:""}">${k>=0?svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'):""}</span><span>${esc(e.name)}</span></button>`}).join("");
-  $("#ddp").scrollTop=sc;
-  const one=sel.length===1?all.find(e=>e.id===sel[0]):null;
-  $("#ddl").innerHTML=one?`<span class="ico">${svg(IC[one.ic]||DB)}</span>${esc(one.name)}`:(sel.length?`<span class="dots">${sel.map((v,k)=>`<i style="background:${COLORS[k]}"></i>`).join("")}</span>${sel.length} Übungen`:"Übungen wählen");
+  sel=sel.filter(v=>ok.has(v));
+  const f1=v=>Math.round(v*10)/10;
+  $("#plist").innerHTML=all.map(e=>{
+    const pts=ptsOf(HA,e.id),on=sel.includes(e.id),c=colorOf(e.id);
+    const cb=`<span class="cb" style="${on?`background:${c};border-color:${c}`:""}">${on?svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'):""}</span>`;
+    if(!pts.length)return `<button class="pr" role="checkbox" aria-checked="false" aria-disabled="true" disabled>${cb}<span class="pn"><b>${esc(e.name)}</b><small>keine Daten</small></span></button>`;
+    const pr=pts[prIdx(pts)],d=f1(pts[pts.length-1].w-pts[0].w),pc=f1(d/pts[0].w*100),col=d>0?"var(--ok)":d<0?"#ff6b6b":"var(--muted)",sg=v=>(v>0?"+":"")+v;
+    return `<button class="pr${on?" on":""}" role="checkbox" aria-checked="${on}" data-px="${e.id}" style="${on?`border-color:${c}`:""}">${cb}<span class="pn"><b>${esc(e.name)}</b><small>🏆 ${pr.w} kg × ${pr.r}</small></span><span class="pv" style="color:${col}"><span>${sg(d)} kg</span><small>${sg(pc)} %</small></span></button>`;
+  }).join("")||'<p class="empty">Noch keine Übungen vorhanden.</p>';
   document.querySelectorAll("#mode button").forEach(b=>b.classList.toggle("on",b.dataset.m===pm));
   draw();
 }
 function draw(){
-  const box=$("#chart"),lg=$("#stats");
-  if(!sel.length){box.innerHTML='<p class="empty">Wähle oben bis zu 6 Übungen aus.</p>';lg.innerHTML="";return}
+  const box=$("#chart");
+  if(!sel.length){box.innerHTML='<p class="empty">Hake unten Übungen an, um sie im Diagramm zu sehen.</p>';return}
   const HA=allH();
-  const ser=sel.map((id,k)=>{
+  const ser=sel.map(id=>{
     const e=S.lib.find(x=>x.id===id);if(!e)return null;
-    const pts=HA.map(h=>{const b=best([h],id);return b&&{t:Date.parse(h.date),w:b.w,r:b.r}}).filter(Boolean).sort((a,b)=>a.t-b.t);
-    return {name:e.name,c:COLORS[k],pts};
+    return {name:e.name,c:colorOf(id),pts:ptsOf(HA,id)};
   }).filter(Boolean);
   const data=ser.filter(x=>x.pts.length),pct=pm==="pct";
-  if(!data.length){box.innerHTML='<p class="empty">Noch keine Einträge für diese Übungen. Speichere ein Training, dann erscheint hier dein Verlauf.</p>';lg.innerHTML="";return}
+  if(!data.length){box.innerHTML='<p class="empty">Noch keine Einträge für diese Übungen. Speichere ein Training, dann erscheint hier dein Verlauf.</p>';return}
   const val=(x,p)=>pct?p.w/x.pts[0].w*100:p.w;
   const vs=[].concat(...data.map(x=>x.pts.map(p=>val(x,p)))),mn=Math.min(...vs),mx=Math.max(...vs);
   const lo=mn===mx?mn-(pct?5:1):mn-(mx-mn)*.2,hi=mn===mx?mx+(pct?5:1):mx+(mx-mn)*.2;
@@ -489,12 +510,6 @@ function draw(){
     x.pts.forEach((p,i)=>{dots+=`<circle class="pt" cx="${X(p.t)}" cy="${Y(val(x,p))}" r="${i===pr?6:3.5}" style="animation-delay:${.3+i*.04}s;fill:${x.c};stroke:${i===pr?"var(--warm2)":"var(--card)"};stroke-width:${i===pr?2.5:1.5}"><title>${esc(x.name)}: ${p.w} kg × ${p.r}, ${dt(p.t)}</title></circle>`});
   });
   box.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Verlauf der besten Arbeitssätze"><defs>${defs}</defs>${grid}${lines}${dots}<text x="${Lm}" y="${H-6}" font-size="10" style="fill:var(--muted)">${dt(t0)}</text>${t1>t0?`<text x="${W-Rm}" y="${H-6}" text-anchor="end" font-size="10" style="fill:var(--muted)">${dt(t1)}</text>`:""}</svg>`;
-  lg.innerHTML=ser.map(x=>{
-    if(!x.pts.length)return `<div class="lg"><i style="background:${x.c}"></i><span class="n">${esc(x.name)}</span><span class="v" style="color:var(--muted)">keine Daten</span></div>`;
-    let pr=0;x.pts.forEach((p,i)=>{if(p.w>x.pts[pr].w||(p.w===x.pts[pr].w&&p.r>=x.pts[pr].r))pr=i});
-    const d=f(x.pts[x.pts.length-1].w-x.pts[0].w);
-    return `<div class="lg"><i style="background:${x.c}"></i><span class="n">${esc(x.name)}</span><span class="v">🏆 ${x.pts[pr].w} kg × ${x.pts[pr].r}</span><span class="d" style="color:${d>=0?"var(--ok)":"#ff6b6b"}">${d>0?"+":""}${d} kg</span></div>`;
-  }).join("");
 }
 function applyTheme(){
   const pref=load("tl_theme","dark");let t=pref;
@@ -510,7 +525,7 @@ function showPage(p){
   PG.forEach(k=>{const el=$(PGID[k]),on=k===p;if(on&&!el.classList.contains("on"))el.style.setProperty("--pd",dir);el.classList.toggle("on",on)});
   document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("on",b.dataset.p===p));moveNav();
   $("#bar").hidden=p!=="T"||editMode;$("#edit").hidden=p!=="T";$("#splw").hidden=p!=="T";
-  if(p==="P")renderProg();if(p==="S"){renderCloud();applyTheme();$("#ack").value=acKey()}if(p==="M")renderTimer();if(p==="N")renderFood();window.scrollTo(0,0);
+  if(p==="P")renderProg();if(p==="S"){renderCloud();applyTheme();}if(p==="M")renderTimer();if(p==="N")renderFood();window.scrollTo(0,0);
 }
 function toast(t,ms=1600,act){
   const e=$("#toast");e.innerHTML="";const sp=document.createElement("span");sp.textContent=t;e.appendChild(sp);
@@ -546,8 +561,8 @@ const uid=p=>p+Date.now().toString(36)+Math.floor(Math.random()*99);
 
 document.addEventListener("click",e=>{
   const g=s=>e.target.closest(s);let b;
-  if(!g("#dd")){$("#dd").classList.remove("open");$("#ddb").setAttribute("aria-expanded","false")}
   if(!g("#splw"))$("#splw").classList.remove("open");
+  if(b=g("#ftog")){fopen=!fopen;b.setAttribute("aria-expanded",fopen);$("#fl").classList.toggle("open",fopen);return}
   if(b=g("#fprev")){fday=shiftDay(-1);fauto=false;return renderFood()}
   if(b=g("#fnext")){fday=shiftDay(1);fauto=fday===todayKey();return renderFood()}
   if(b=g("#ftoday")){fday=todayKey();fauto=true;return renderFood()}
@@ -567,7 +582,6 @@ document.addEventListener("click",e=>{
   if(b=g("#aback")){aStep(1);return}
   if(b=g("[data-arm]")){b.closest(".ar").remove();aTotal();return}
   if(b=g("#aadd")){const rows=aRows().filter(r=>r.kcal||r.p);if(!rows.length){toast("Nichts zum Hinzufügen",1600);return}rows.forEach(r=>addFood({name:r.name,kcal:r.kcal,p:r.p,src:"ai"}));$("#dlga").close();toast(rows.length+" Eintrag"+(rows.length>1?"e":"")+" hinzugefügt",1600);return}
-  if(b=g("#acsave")){store("tl_ack",$("#ack").value.trim());AIM=null;toast("Schlüssel gespeichert",1600);return}
   if(b=g("#splitb")){$("#splw").classList.toggle("open");return}
   if(b=g("[data-sp]")){$("#splw").classList.remove("open");setSplit(b.dataset.sp);return}
   if(b=g("#newsp")){$("#splw").classList.remove("open");newSplit();return}
@@ -581,12 +595,11 @@ document.addEventListener("click",e=>{
   if(b=g(".chip[data-s]")){const v=+b.dataset.s;if(pedit){presets=presets.filter(x=>x!==v);store("tl_presets",presets);renderChips()}else setDur(v);return}
   if(b=g("#cno"))return $("#dlgc").close();
   if(b=g("#cyes")){$("#dlgc").close();if(cfn){const f=cfn;cfn=null;f()}return}
-  if(b=g(".ddo[data-v]")){const v=b.dataset.v,i=sel.indexOf(v);
-    if(i>=0)sel.splice(i,1);else{if(sel.length>=6){toast("Maximal 6 Übungen",1800);return}sel.push(v)}
+  if(b=g(".pr[data-px]")){const v=b.dataset.px,i=sel.indexOf(v);
+    if(i>=0)sel.splice(i,1);else sel.push(v);
     store("tl_sel",sel);renderProg();return}
   if(b=g("#mode button")){pm=b.dataset.m;store("tl_pm",pm);renderProg();return}
   if(b=g("[data-th]")){store("tl_theme",b.dataset.th);applyTheme();return}
-  if(b=g("#ddb")){const o=$("#dd").classList.toggle("open");b.setAttribute("aria-expanded",o);return}
   if(b=g(".nav button"))return showPage(b.dataset.p);
   if(b=g("#addt")){const t={id:uid("t"),name:"Neuer Tag",c:ST().length%PAL.length,ex:[]};S.tabs.push(t);SP().tabs.push(t.id);S.tab=t.id;editMode=true;sv();renderAll("next");const i=$("#tn");if(i){i.focus();i.select()}return}
   if(b=g(".tab[data-id]"))return switchTab(b.dataset.id);
@@ -641,7 +654,7 @@ document.addEventListener("input",e=>{
   if(el.id==="sn"){SP().name=v;sv();$("#spl").textContent=v||"Split";return}
   if(el.classList.contains("nm")){const id=el.dataset.id;S.lib.forEach(x=>{if(x.id===id)x.name=v});S.tabs.forEach(t=>t.ex.forEach(x=>{if(x.id===id)x.name=v}));sv()}
 });
-document.addEventListener("keydown",e=>{if(e.key==="Escape")$("#dd").classList.remove("open")});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")$("#splw").classList.remove("open")});
 $("#pw").addEventListener("keydown",e=>{if(e.key==="Enter")$("#yes").click()});
 let sw=null,nbId="",busy=false;
 const canSwipe=()=>!editMode&&$("#pgT").classList.contains("on")&&!document.querySelector("dialog[open]");
@@ -973,7 +986,7 @@ const pad2=n=>String(n).padStart(2,"0");
 const dkey=d=>d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate());
 const todayKey=()=>dkey(new Date());
 const shiftDay=n=>{const d=new Date(fday+"T12:00:00");d.setDate(d.getDate()+n);return dkey(d)};
-let fday=todayKey(),fauto=true,gedit=false,frecs=[],afile=null,aurl="",AIM=null;
+let fopen=false,fday=todayKey(),fauto=true,gedit=false,frecs=[],afile=null,aurl="",AIM=null;
 const FD=()=>S.food;
 const fnum=x=>{x=parseFloat(String(x==null?"":x).replace(",","."));return isFinite(x)&&x>0?Math.round(x*10)/10:0};
 const dayEntries=k=>FD().days[k]||[];
@@ -1005,14 +1018,14 @@ function renderFood(){
   box.innerHTML=`<div class="card fsum"><div class="m"><div class="mh"><b>Kalorien</b><span>${Math.round(s2.k)} / ${g.kcal} kcal</span></div><div class="mbar${s2.k>g.kcal?" over":""}"><i style="width:${pk}%"></i></div><div class="mr">${kr>=0?"noch "+kr+" kcal":Math.abs(kr)+" kcal drüber"}</div></div><div class="m"><div class="mh"><b>Protein</b><span>${Math.round(s2.p)} / ${g.protein} g</span></div><div class="mbar${s2.p>=g.protein?" ok":""}"><i style="width:${pp}%"></i></div><div class="mr">${pr>0?"noch "+pr+" g":"Ziel erreicht ✓"}</div></div></div>`+
   `<div class="dbtn" style="margin:10px 0"><button class="btn" id="fman">＋ Manuell</button><button class="btn main" id="fai">📷 Foto + KI</button></div>`+
   (frecs.length?`<div class="rec">${frecs.map((e,i)=>`<button class="chip" data-frec="${i}">${esc(e.name||"Eintrag")} · ${e.kcal}</button>`).join("")}</div>`:"")+
-  (list.map(e=>`<div class="frow"><span class="fn">${esc(e.name||"Eintrag")}${e.src==="ai"?" ✨":""}</span><span class="fv">${e.kcal} kcal · ${e.p} g</span><button data-fdel="${e.id}" aria-label="Löschen">✕</button></div>`).join("")||`<p class="empty" style="margin:18px 8px">Noch nichts eingetragen.</p>`)+
+  (list.length?`<button class="ftog" id="ftog" aria-expanded="${fopen}" aria-controls="fl"><span class="ft">Einträge</span><span class="fc">${list.length}</span><span class="fs">${Math.round(s2.k)} kcal · ${Math.round(s2.p)} g</span>${svg('<path d="M6 9l6 6 6-6"/>','class="chev"')}</button><div class="fl${fopen?" open":""}" id="fl"><div>${list.map(e=>`<div class="frow"><span class="fn">${esc(e.name||"Eintrag")}${e.src==="ai"?" ✨":""}</span><span class="fv">${e.kcal} kcal · ${e.p} g</span><button data-fdel="${e.id}" aria-label="Löschen">✕</button></div>`).join("")}</div></div>`:`<p class="empty" style="margin:18px 8px">Noch nichts eingetragen.</p>`)+
   `<button class="reset" id="fgoal" style="margin-top:14px">Tagesbedarf ändern</button>`;
 }
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&["fn","fk","fp"].includes(e.target.id))$("#fyes").click()});
 // ---------- KI: Foto -> Kalorien (Firebase AI Logic, Gemini Developer API, Spark-Plan) ----------
 const AI_MODELS=["gemini-3.5-flash","gemini-3.5-flash-lite"];
-const APPCHECK_KEY="";  // optional: reCAPTCHA-Enterprise-Schlüssel hier fest eintragen
-const acKey=()=>APPCHECK_KEY||load("tl_ack","");
+const APPCHECK_KEY="6LflpfYtAAAAAH5yHz9qt9j5vi9mrOhOMZwkhKyW";  // reCAPTCHA-Enterprise-Schlüssel (App Check)
+const acKey=()=>APPCHECK_KEY;
 const AI_PROMPT='Du bist ein Ernährungsassistent. Analysiere das Foto einer Mahlzeit und/oder die Beschreibung. Schätze für jedes erkennbare Gericht bzw. Lebensmittel die Kalorien (kcal) und das Protein (g) der sichtbaren Portion. Sei realistisch bei Portionsgrößen. Antworte ausschließlich als JSON im Format {"items":[{"name":"Hähnchenbrust","kcal":250,"protein":46}]} mit höchstens 6 Einträgen. Namen auf Deutsch, kcal und protein als ganze Zahlen.';
 async function aiInit(){
   if(AIM)return AIM;
@@ -1053,7 +1066,7 @@ async function aiAnalyze(file,hint){
 }
 function aiErr(e){
   const m=String(e&&e.message||e),c=e&&e.code;
-  if(c==="nokey")return"Es fehlt der App-Check-Schlüssel (Einstellungen → KI-Foto-Analyse).";
+  if(c==="nokey")return"Der App-Check-Schlüssel fehlt in der App.";
   if(c==="offline")return"Keine Verbindung zu Firebase. Bist du online?";
   if(c==="empty")return"Die KI hat nichts erkannt. Versuche ein anderes Foto oder eine Beschreibung.";
   if(/429|quota|exhaust|rate/i.test(m))return"KI-Kontingent aufgebraucht. Bitte später erneut versuchen.";

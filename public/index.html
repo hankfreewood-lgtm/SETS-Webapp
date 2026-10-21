@@ -315,7 +315,7 @@ dialog.big{width:min(380px,calc(100vw - 32px));max-height:calc(100dvh - 48px);ov
     <div style="text-align:center;margin:-6px 0 14px"><button class="pill" id="tedit">Presets bearbeiten</button></div>
     <div class="dbtn"><button class="btn" id="treset">Zurücksetzen</button><button class="btn main" id="tstart">Start</button></div>
     <div style="text-align:center;margin-top:16px"><button class="pill" id="tnotif"></button></div>
-    <p class="meta" style="white-space:normal;text-align:center;margin-top:10px">Der Ton läuft wie ein Benachrichtigungston und unterbricht deine Musik nicht. Der Bildschirm bleibt während des Timers an. Bei gesperrtem Bildschirm oder anderer App kommt statt des Tons nur die Benachrichtigung (falls erlaubt).</p>
+    <p class="meta" style="white-space:normal;text-align:center;margin-top:10px">Der Ton läuft wie ein Benachrichtigungston und unterbricht deine Musik nicht. Auch bei gesperrtem Bildschirm oder in einer anderen App soll der Ton kommen. Das hängt vom Handy ab; zusätzlich gibt es die Benachrichtigung (falls erlaubt).</p>
   </div>
   <div id="pgP" class="pg">
     <div class="hd" style="margin-top:14px"><h1>Fortschritt</h1></div>
@@ -1052,25 +1052,33 @@ function tUpdate(){
   if(tm.run){tm.left=(tm.end-Date.now())/1000;if(tm.left<=0){tFinish();return}}
   renderTimer();
 }
+// Hält die App im Hintergrund/bei gesperrtem Bildschirm am Leben: kaum hörbarer Dauerton über Web Audio.
+// Web Audio fordert keinen Audio-Fokus an (anders als <audio>), Musik läuft also weiter.
+let keep=null;
+function startKeep(){
+  stopKeep();if(!actx)return;
+  try{const o=actx.createOscillator(),g=actx.createGain();o.type="sine";o.frequency.value=30;g.gain.value=.012;o.connect(g);g.connect(actx.destination);o.start();keep={o,g}}catch(e){keep=null}
+}
+function stopKeep(){if(!keep)return;try{keep.o.stop();keep.o.disconnect();keep.g.disconnect()}catch(e){}keep=null}
 function cancelBell(){if(bellSched){bellSched.cancel();bellSched=null}}
 function tStart(){
   initAudio();
-  if(tm.run){tm.run=false;clearInterval(tm.tick);tm.left=Math.max(0,(tm.end-Date.now())/1000);relWL();cancelBell()}
-  else{if(tm.left<=0)tm.left=tm.dur;tm.end=Date.now()+tm.left*1000;tm.run=true;clearInterval(tm.tick);tm.tick=setInterval(tUpdate,200);reqWL();askNotif();cancelBell();bellSched=bell(tm.left)}
+  if(tm.run){tm.run=false;clearInterval(tm.tick);tm.left=Math.max(0,(tm.end-Date.now())/1000);relWL();cancelBell();stopKeep()}
+  else{if(tm.left<=0)tm.left=tm.dur;tm.end=Date.now()+tm.left*1000;tm.run=true;clearInterval(tm.tick);tm.tick=setInterval(tUpdate,200);reqWL();askNotif();cancelBell();bellSched=bell(tm.left);startKeep()}
   renderTimer();
 }
-function tReset(){tm.run=false;clearInterval(tm.tick);tm.left=tm.dur;relWL();cancelBell();renderTimer()}
+function tReset(){tm.run=false;clearInterval(tm.tick);tm.left=tm.dur;relWL();cancelBell();stopKeep();renderTimer()}
 function tFinish(){
   const late=Date.now()-tm.end>3000;
   tm.run=false;clearInterval(tm.tick);tm.left=0;relWL();renderTimer();
-  if(late)cancelBell();
+  if(late){cancelBell();stopKeep()}
   else{
     const ok=bellSched&&actx&&actx.state==="running"&&actx.currentTime>=bellSched.at-.15;
     if(!ok){cancelBell();bell()}
     if(navigator.vibrate)navigator.vibrate([250,120,250]);
     notify();
   }
-  bellSched=null;toast("⏱ Pause vorbei",2500);
+  bellSched=null;setTimeout(()=>{if(!tm.run)stopKeep()},4500);toast("⏱ Pause vorbei",2500);
 }
 let pedit=false;
 function addPreset(){
